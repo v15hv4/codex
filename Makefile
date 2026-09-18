@@ -2,7 +2,7 @@ CODEX_RS := codex-rs
 PREFIX ?= $(HOME)/.local
 BINDIR := $(PREFIX)/bin
 
-.PHONY: build install v8
+.PHONY: build install release v8
 
 v8:
 	@V8_DIR="$$HOME/.cache/codex-v8/150.4.0"; \
@@ -28,3 +28,9 @@ install: build
 	@install -m 0755 $(CODEX_RS)/target/release/codex $(BINDIR)/codex
 	@install -m 0755 $(CODEX_RS)/target/release/codex-code-mode-host $(BINDIR)/codex-code-mode-host
 	@install -m 0755 $(CODEX_RS)/target/release/codex-responses-api-proxy $(BINDIR)/codex-responses-api-proxy
+
+release:
+	@version="$$(sed -n 's/^version = "\(.*\)"/\1/p' $(CODEX_RS)/Cargo.toml | head -1)"; \
+		tag="rust-v$$version"; \
+		git tag -a "$$tag" -m "Release $$version"; \
+		git push origin "$$tag"
