@@ -30,6 +30,16 @@ install: build
 	@install -m 0755 $(CODEX_RS)/target/release/codex-responses-api-proxy $(BINDIR)/codex-responses-api-proxy
 
 release:
-	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=0.1.0" >&2; exit 2)
-	@git tag -a "rust-v$(VERSION)" -m "Release $(VERSION)"
-	@git push origin "rust-v$(VERSION)"
+	@test -z "$$(git status --porcelain)" || (echo "Working tree must be clean" >&2; exit 2)
+	@latest="$$(git tag --list 'rust-v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -1)"; \
+		test -n "$$latest" || (echo "No release tag found" >&2; exit 2); \
+		base="$${latest#rust-v}"; patch="$${base##*.}"; prefix="$${base%.*}"; \
+		version="$$prefix.$$((patch + 1))"; tag="rust-v$$version"; \
+		test -z "$$(git tag --list "$$tag")" || (echo "Tag $$tag already exists" >&2; exit 2); \
+		sed -i 's/^version = ".*"/version = "'"$$version"'"/' $(CODEX_RS)/Cargo.toml; \
+		cd $(CODEX_RS) && cargo metadata --format-version 1 --no-deps >/dev/null; cd ..; \
+		git add $(CODEX_RS)/Cargo.toml $(CODEX_RS)/Cargo.lock; \
+		git commit -m "Release $$version"; \
+		git push origin HEAD:main; \
+		git tag -a "$$tag" -m "Release $$version"; \
+		git push origin "$$tag"
