@@ -82,30 +82,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15-xlarge
-            target: aarch64-apple-darwin
-            bundle: primary
-            artifact_name: aarch64-apple-darwin
-            binaries: "codex codex-code-mode-host codex-responses-api-proxy"
-            build_dmg: "true"
-          - runner: macos-15-xlarge
-            target: aarch64-apple-darwin
-            bundle: app-server
-            artifact_name: aarch64-apple-darwin-app-server
-            binaries: "codex-app-server codex-code-mode-host"
-            build_dmg: "false"
-          - runner: macos-15-xlarge
-            target: x86_64-apple-darwin
-            bundle: primary
-            artifact_name: x86_64-apple-darwin
-            binaries: "codex codex-code-mode-host codex-responses-api-proxy"
-            build_dmg: "true"
-          - runner: macos-15-xlarge
-            target: x86_64-apple-darwin
-            bundle: app-server
-            artifact_name: x86_64-apple-darwin-app-server
-            binaries: "codex-app-server codex-code-mode-host"
-            build_dmg: "false"
+          # macOS builds are temporarily disabled.
+          # - runner: macos-15-xlarge
+          #   target: aarch64-apple-darwin
+          #   bundle: primary
+          #   artifact_name: aarch64-apple-darwin
+          #   binaries: "codex codex-code-mode-host codex-responses-api-proxy"
+          #   build_dmg: "true"
+          # - runner: macos-15-xlarge
+          #   target: aarch64-apple-darwin
+          #   bundle: app-server
+          #   artifact_name: aarch64-apple-darwin-app-server
+          #   binaries: "codex-app-server codex-code-mode-host"
+          #   build_dmg: "false"
+          # - runner: macos-15-xlarge
+          #   target: x86_64-apple-darwin
+          #   bundle: primary
+          #   artifact_name: x86_64-apple-darwin
+          #   binaries: "codex codex-code-mode-host codex-responses-api-proxy"
+          #   build_dmg: "true"
+          # - runner: macos-15-xlarge
+          #   target: x86_64-apple-darwin
+          #   bundle: app-server
+          #   artifact_name: x86_64-apple-darwin-app-server
+          #   binaries: "codex-app-server codex-code-mode-host"
+          #   build_dmg: "false"
           # Release artifacts intentionally ship MUSL-linked Linux binaries.
           - runner: ${{ github.event.repository.name }}-linux-x64-xl
             target: x86_64-unknown-linux-musl
@@ -119,18 +120,19 @@ jobs:
             artifact_name: x86_64-unknown-linux-musl-app-server
             binaries: "codex-app-server codex-code-mode-host"
             build_dmg: "false"
-          - runner: ${{ github.event.repository.name }}-linux-arm64
-            target: aarch64-unknown-linux-musl
-            bundle: primary
-            artifact_name: aarch64-unknown-linux-musl
-            binaries: "codex codex-code-mode-host codex-responses-api-proxy bwrap"
-            build_dmg: "false"
-          - runner: ${{ github.event.repository.name }}-linux-arm64
-            target: aarch64-unknown-linux-musl
-            bundle: app-server
-            artifact_name: aarch64-unknown-linux-musl-app-server
-            binaries: "codex-app-server codex-code-mode-host"
-            build_dmg: "false"
+          # Linux ARM64 builds are temporarily disabled.
+          # - runner: ${{ github.event.repository.name }}-linux-arm64
+          #   target: aarch64-unknown-linux-musl
+          #   bundle: primary
+          #   artifact_name: aarch64-unknown-linux-musl
+          #   binaries: "codex codex-code-mode-host codex-responses-api-proxy bwrap"
+          #   build_dmg: "false"
+          # - runner: ${{ github.event.repository.name }}-linux-arm64
+          #   target: aarch64-unknown-linux-musl
+          #   bundle: app-server
+          #   artifact_name: aarch64-unknown-linux-musl-app-server
+          #   binaries: "codex-app-server codex-code-mode-host"
+          #   build_dmg: "false"
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -543,6 +545,8 @@ jobs:
             codex-rs/dist/${{ matrix.target }}/*
 
   build-macos-voice:
+    # macOS builds are temporarily disabled.
+    if: ${{ false }}
     needs: tag-check
     name: Build voice runtime - ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -1468,6 +1472,8 @@ jobs:
     secrets: inherit
 
   build-windows:
+    # Windows builds are temporarily disabled.
+    if: ${{ false }}
     needs: tag-check
     uses: ./.github/workflows/rust-release-windows.yml
     secrets: inherit
