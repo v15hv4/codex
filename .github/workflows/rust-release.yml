@@ -12,6 +12,12 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  AWS_LC_SYS_NO_JITTER_ENTROPY: "1"
+  AWS_LC_SYS_NO_JITTER_ENTROPY_x86_64_unknown_linux_musl: "1"
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  TARGET: x86_64-unknown-linux-musl
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -21,6 +27,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          targets: ${{ env.TARGET }}
       - name: Validate release version
         shell: bash
         run: |
@@ -32,24 +40,55 @@ jobs:
             exit 1
           }
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libcap-dev
-      - name: Build release binaries
-        run: make build
-      - name: Package release binaries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends binutils libcap-dev pkg-config
+      - name: Install Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.14.0
+          use-cache: false
+      - name: Install musl build tools
+        run: bash .github/scripts/install-musl-build-tools.sh
+      - name: Configure rusty_v8 artifact overrides and verify checksums
+        uses: ./.github/actions/setup-rusty-v8
+        with:
+          target: ${{ env.TARGET }}
+      - name: Build bwrap and export its digest
         shell: bash
         run: |
           set -euo pipefail
-          archive="codex-x86_64-unknown-linux-gnu.tar.gz"
-          tar -C codex-rs/target/release -czf "$archive" \
-            codex codex-code-mode-host codex-responses-api-proxy
-          sha256sum "$archive" > "$archive.sha256"
+          cd codex-rs
+          cargo build --target "$TARGET" --release --bin bwrap
+          bwrap="target/$TARGET/release/bwrap"
+          strip --strip-debug --strip-unneeded "$bwrap"
+          echo "CODEX_BWRAP_SHA256=$(sha256sum "$bwrap" | awk '{print $1}')" >> "$GITHUB_ENV"
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd codex-rs
+          export STABLE_GIT_COMMIT
+          STABLE_GIT_COMMIT="$(git rev-parse HEAD)"
+          cargo build --target "$TARGET" --release \
+            --bin codex \
+            --bin codex-code-mode-host \
+            --bin codex-responses-api-proxy
+      - name: Build installer package
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/build-codex-package-archive.sh \
+            --target "$TARGET" \
+            --bundle primary \
+            --entrypoint-dir "codex-rs/target/$TARGET/release" \
+            --archive-dir dist
+          (cd dist && sha256sum "codex-package-$TARGET.tar.gz" > codex-package_SHA256SUMS)
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "$GITHUB_REF_NAME"
-          codex-x86_64-unknown-linux-gnu.tar.gz
-          codex-x86_64-unknown-linux-gnu.tar.gz.sha256
+          "dist/codex-package-$TARGET.tar.gz"
+          dist/codex-package_SHA256SUMS
           --verify-tag
           --generate-notes
           --latest
