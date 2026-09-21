@@ -1,4 +1,6 @@
 mod account;
+#[path = "account_system_proxy_tests.rs"]
+mod account_system_proxy;
 mod account_thread_usage;
 mod analytics;
 mod app_installed;
@@ -72,6 +74,7 @@ mod memory_reset;
 mod misalignment_policy;
 mod model_auto_review;
 mod model_list;
+mod model_list_requirements_tests;
 mod model_provider_capabilities_read;
 #[path = "model_provider_enforcement_tests.rs"]
 mod model_provider_enforcement;
