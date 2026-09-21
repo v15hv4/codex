@@ -340,6 +340,9 @@ impl ChatWidget {
                 self.open_model_popup();
                 self.defer_input_until_settings_applied();
             }
+            SlashCommand::Advisor => {
+                self.open_advisor_popup();
+            }
             SlashCommand::Plan => {
                 self.apply_plan_slash_command();
             }
@@ -1177,6 +1180,7 @@ impl ChatWidget {
             plugins_command_enabled: self.config.features.enabled(Feature::Plugins),
             token_activity_command_enabled: self.has_codex_backend_auth,
             goal_command_enabled: self.config.features.enabled(Feature::Goals),
+            advisor_command_enabled: self.config.features.enabled(Feature::Advisor),
             service_tier_commands_enabled: self.fast_mode_enabled(),
             voice_command_enabled: self.realtime_conversation_available_for_thread,
             worktrees_enabled: self.config.features.enabled(Feature::Worktrees)
@@ -1246,6 +1250,7 @@ impl ChatWidget {
             | SlashCommand::Compact
             | SlashCommand::Review
             | SlashCommand::Model
+            | SlashCommand::Advisor
             | SlashCommand::Plan
             | SlashCommand::Goal
             | SlashCommand::Side

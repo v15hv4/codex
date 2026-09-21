@@ -3310,6 +3310,25 @@ async fn model_selection_popup_snapshot() {
     assert_chatwidget_snapshot!("model_selection_popup", popup);
 }
 
+#[tokio::test]
+async fn advisor_selection_popup_snapshot() {
+    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.5")).await;
+    chat.set_feature_enabled(Feature::Advisor, /*enabled*/ true);
+    chat.config.advisor_model = Some("gpt-6-astra".to_string());
+    chat.config.advisor_models = vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()];
+
+    chat.open_advisor_popup();
+
+    let popup = render_bottom_popup(&chat, /*width*/ 88);
+    assert_chatwidget_snapshot!("advisor_selection_popup", popup);
+
+    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
+    assert_matches!(
+        rx.try_recv(),
+        Ok(AppEvent::UpdateAdvisorModel(Some(model))) if model == "gpt-6-astra"
+    );
+}
+
 fn apply_model_list_response(chat: &mut ChatWidget, presets: Vec<ModelPreset>) {
     let request_id = chat.model_popup_request_id.expect("pending model request");
     assert!(chat.on_models_loaded(request_id, Ok(presets)));

@@ -646,6 +646,9 @@
           "default": null,
           "description": "Optional feature toggles scoped to this profile.",
           "properties": {
+            "advisor": {
+              "type": "boolean"
+            },
             "analytics_plan_history": {
               "type": "boolean"
             },
@@ -6354,6 +6357,17 @@
   },
   "description": "Base config deserialized from ~/.codex/config.toml.",
   "properties": {
+    "advisor_model": {
+      "description": "Model selected for the experimental advisor tool.",
+      "type": "string"
+    },
+    "advisor_models": {
+      "description": "Models shown by the experimental `/advisor` picker.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "agents": {
       "allOf": [
         {
@@ -6520,6 +6534,9 @@
       "default": null,
       "description": "Centralized feature flags (new). Prefer this over individual toggles.",
       "properties": {
+        "advisor": {
+          "type": "boolean"
+        },
         "analytics_plan_history": {
           "type": "boolean"
         },

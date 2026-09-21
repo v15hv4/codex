@@ -1,0 +1,13 @@
+---
+source: tui/src/chatwidget/tests/popups_and_settings.rs
+expression: popup
+---
+  Select Advisor
+  The executor can consult this read-only model when it needs stronger judgment.
+
+
+› 1. GPT-6-Astra (current)  gpt-6-astra
+  2. GPT-5.6-Sol            gpt-5.6-sol
+  3. Off                    Do not expose the advisor tool
+
+  enter select · esc back

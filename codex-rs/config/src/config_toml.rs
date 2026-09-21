@@ -160,6 +160,12 @@ pub struct ConfigToml {
     /// Review model override used by the `/review` feature.
     pub review_model: Option<String>,
 
+    /// Model selected for the experimental advisor tool.
+    pub advisor_model: Option<String>,
+
+    /// Models shown by the experimental `/advisor` picker.
+    pub advisor_models: Option<Vec<String>>,
+
     /// Provider to use from the model_providers map.
     pub model_provider: Option<String>,
 

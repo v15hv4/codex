@@ -118,6 +118,8 @@ pub enum Feature {
     ExecutedToolCallMetadata,
     /// Enable JavaScript code mode backed by the standalone host process.
     CodeMode,
+    /// Let the executor consult a configured read-only advisor model.
+    Advisor,
     /// Removed compatibility flag for the configurable code-mode exec yield timeout.
     CodeModeBufferedExec,
     /// Run JavaScript code mode in the standalone host process.
@@ -939,6 +941,16 @@ pub const FEATURES: &[FeatureSpec] = &[
             name: "Automatically start the background server",
             menu_description: "Use the shared local server for new, resumed, and forked sessions. Takes effect next launch.",
             announcement: "Automatic background server startup can now be enabled from /experimental.",
+        },
+        default_enabled: false,
+    },
+    FeatureSpec {
+        id: Feature::Advisor,
+        key: "advisor",
+        stage: Stage::Experimental {
+            name: "Advisor mode",
+            menu_description: "Let Codex consult a selected advisor model during difficult tasks. Takes effect next launch.",
+            announcement: "NEW: Advisor mode can now be enabled from /experimental.",
         },
         default_enabled: false,
     },

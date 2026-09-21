@@ -581,6 +581,11 @@ impl BottomPane {
         self.request_redraw();
     }
 
+    pub fn set_advisor_command_enabled(&mut self, enabled: bool) {
+        self.composer.set_advisor_command_enabled(enabled);
+        self.request_redraw();
+    }
+
     pub fn set_voice_command_enabled(&mut self, enabled: bool) {
         self.composer.set_voice_command_enabled(enabled);
         self.request_redraw();

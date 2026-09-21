@@ -621,6 +621,12 @@ pub struct Config {
     /// Model used specifically for review sessions.
     pub review_model: Option<String>,
 
+    /// Model selected for the experimental advisor tool.
+    pub advisor_model: Option<String>,
+
+    /// Models available in the experimental advisor picker.
+    pub advisor_models: Vec<String>,
+
     /// Size of the context window for the model, in tokens.
     pub model_context_window: Option<i64>,
 
@@ -3977,6 +3983,12 @@ impl Config {
             .map(AbsolutePathBuf::into_path_buf);
 
         let review_model = override_review_model.or(cfg.review_model);
+        let advisor_models = cfg.advisor_models.unwrap_or_else(|| {
+            vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()]
+        });
+        let advisor_model = cfg
+            .advisor_model
+            .filter(|model| advisor_models.iter().any(|available| available == model));
 
         let check_for_update_on_startup = cfg.check_for_update_on_startup.unwrap_or(true);
         let model_catalog = load_model_catalog(cfg.model_catalog_json.clone())?;
@@ -4184,6 +4196,8 @@ impl Config {
             model,
             service_tier,
             review_model,
+            advisor_model,
+            advisor_models,
             model_context_window: cfg.model_context_window,
             model_auto_compact_token_limit: cfg.model_auto_compact_token_limit,
             model_auto_compact_token_limit_scope: cfg

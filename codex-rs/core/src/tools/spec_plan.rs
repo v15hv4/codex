@@ -6,6 +6,7 @@ use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use crate::tools::code_mode::execute_spec::create_code_mode_tool;
 use crate::tools::effective_tool_mode;
+use crate::tools::handlers::AdvisorHandler;
 use crate::tools::handlers::ApplyPatchHandler;
 use crate::tools::handlers::CodeModeExecuteHandler;
 use crate::tools::handlers::CodeModeWaitHandler;
@@ -1099,6 +1100,13 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
 
     if turn_context.config.update_plan_enabled {
         registry.add(PlanHandler);
+    }
+
+    if features.enabled(Feature::Advisor)
+        && !turn_context.session_source.is_non_root_agent()
+        && let Some(model) = turn_context.config.advisor_model.clone()
+    {
+        registry.add_with_exposure(AdvisorHandler::new(model), ToolExposure::DirectModelOnly);
     }
 
     if features.enabled(Feature::DeferredExecutor) {

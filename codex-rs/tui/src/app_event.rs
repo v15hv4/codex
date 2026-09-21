@@ -1127,6 +1127,9 @@ pub(crate) enum AppEvent {
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 
+    /// Select the model exposed through the experimental advisor tool.
+    UpdateAdvisorModel(Option<String>),
+
     /// Apply a final Astra picker action and offer the flourish only if it changed the model on
     /// its original task. Automatic model updates do not use this event.
     AstraSelectedFromModelPicker {

@@ -1858,6 +1858,34 @@ impl App {
                         .await;
                 }
             }
+            AppEvent::UpdateAdvisorModel(model) => {
+                let edit = match model.as_ref() {
+                    Some(model) => crate::config_update::replace_config_value(
+                        "advisor_model",
+                        serde_json::json!(model),
+                    ),
+                    None => crate::config_update::clear_config_value("advisor_model"),
+                };
+                match crate::config_update::write_config_batch(
+                    app_server.request_handle(),
+                    vec![edit],
+                )
+                .await
+                {
+                    Ok(_) => {
+                        self.chat_widget.set_advisor_model(model.clone());
+                        let message = model.map_or_else(
+                            || "Advisor disabled".to_string(),
+                            |model| format!("Advisor set to {model}"),
+                        );
+                        self.chat_widget.add_info_message(message, /*hint*/ None);
+                    }
+                    Err(err) => self.chat_widget.add_error_message(format!(
+                        "Failed to save advisor selection: {}",
+                        format_config_error(&err)
+                    )),
+                }
+            }
             AppEvent::AstraSelectedFromModelPicker { thread_id, model, action } => {
                 // Check and apply in the same event so a queued backend update cannot turn a
                 // no-op picker confirmation into a sparkle.

@@ -2066,6 +2066,8 @@ impl Session {
                 .with_user_layer_from(&next_config.config_layer_stack);
             config.tool_suggest =
                 resolve_tool_suggest_config_from_layer_stack(&config.config_layer_stack);
+            config.advisor_model = next_config.advisor_model.clone();
+            config.advisor_models = next_config.advisor_models.clone();
             config.mcp_servers = next_config.mcp_servers.clone();
             config.mcp_optional_startup_grace = next_config.mcp_optional_startup_grace;
             config.mcp_oauth_credentials_store_mode = next_config.mcp_oauth_credentials_store_mode;
@@ -2270,6 +2272,26 @@ impl Session {
             }
             config.tool_suggest =
                 resolve_tool_suggest_config_from_layer_stack(&config.config_layer_stack);
+            config.advisor_models = config
+                .config_layer_stack
+                .effective_config()
+                .get("advisor_models")
+                .and_then(toml::Value::as_array)
+                .map(|models| {
+                    models
+                        .iter()
+                        .filter_map(toml::Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_else(|| vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()]);
+            config.advisor_model = config
+                .config_layer_stack
+                .effective_config()
+                .get("advisor_model")
+                .and_then(toml::Value::as_str)
+                .map(str::to_string)
+                .filter(|model| config.advisor_models.iter().any(|item| item == model));
             config
         };
         self.services.skills_service.clear_cache();

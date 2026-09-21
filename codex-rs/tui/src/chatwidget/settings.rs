@@ -97,6 +97,9 @@ impl ChatWidget {
                 self.update_collaboration_mode_indicator();
             }
         }
+        if feature == Feature::Advisor {
+            self.sync_advisor_command_enabled();
+        }
         if feature == Feature::RealtimeConversation && !enabled {
             self.realtime_conversation_available_for_thread = false;
             self.bottom_pane
@@ -298,6 +301,15 @@ impl ChatWidget {
     pub(super) fn sync_goal_command_enabled(&mut self) {
         self.bottom_pane
             .set_goal_command_enabled(self.config.features.enabled(Feature::Goals));
+    }
+
+    pub(super) fn sync_advisor_command_enabled(&mut self) {
+        self.bottom_pane
+            .set_advisor_command_enabled(self.config.features.enabled(Feature::Advisor));
+    }
+
+    pub(crate) fn set_advisor_model(&mut self, model: Option<String>) {
+        self.config.advisor_model = model;
     }
 
     pub(super) fn sync_mentions_v2_enabled(&mut self) {
