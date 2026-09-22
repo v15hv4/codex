@@ -2198,8 +2198,10 @@ impl BottomPane {
                 },
             );
             let question_editor = self.questions.as_ref().filter(|q| q.expanded);
+            // An empty shared gap already separates activity from the composer.
             if !has_inline_previews
                 && has_status_or_footer
+                && options.composer_gap.is_none_or(|gap| gap.needs_separator)
                 && question_editor.is_none_or(|q| q.unanswered_count() > 1)
             {
                 flex.push(/*flex*/ 0, RenderableItem::Owned("".into()));
@@ -2569,7 +2571,9 @@ mod tests {
             .expect("valid optional banner");
             let (tx, mut rx) = unbounded_channel();
             let mut pane = test_pane(AppEventSender::new(tx));
-            pane.set_inline_banner(Some(banner.actionable_banner()));
+            pane.set_inline_banner(Some(
+                banner.actionable_banner(crate::clock_format::ClockFormat::TwentyFourHour),
+            ));
             let width = 44;
             let area = Rect::new(
                 /*x*/ 0,
