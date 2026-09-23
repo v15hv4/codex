@@ -3315,7 +3315,11 @@ async fn advisor_selection_popup_snapshot() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.5")).await;
     chat.set_feature_enabled(Feature::Advisor, /*enabled*/ true);
     chat.config.advisor_model = Some("gpt-6-astra".to_string());
-    chat.config.advisor_models = vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()];
+    chat.config.advisor_models = vec![
+        "gpt-6-astra".to_string(),
+        "gpt-5.6-sol".to_string(),
+        "jev-latest".to_string(),
+    ];
 
     chat.open_advisor_popup();
 

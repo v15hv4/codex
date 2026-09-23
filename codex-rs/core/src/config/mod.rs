@@ -4003,7 +4003,7 @@ impl Config {
 
         let review_model = override_review_model.or(cfg.review_model);
         let advisor_models = cfg.advisor_models.unwrap_or_else(|| {
-            vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()]
+            vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string(), "jev-latest".to_string()]
         });
         let advisor_model = cfg
             .advisor_model

@@ -51,7 +51,7 @@ impl ChatWidget {
             items,
             header: self.model_menu_header(
                 "Select Advisor",
-                "The executor can consult this read-only model when it needs stronger judgment.",
+                "The executor can consult this read-only model. Jev needs a TypeSafe API key.",
             ),
             ..SelectionViewParams::picker()
         });

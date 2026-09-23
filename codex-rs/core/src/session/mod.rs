@@ -2280,7 +2280,13 @@ impl Session {
                         .map(str::to_string)
                         .collect()
                 })
-                .unwrap_or_else(|| vec!["gpt-6-astra".to_string(), "gpt-5.6-sol".to_string()]);
+                .unwrap_or_else(|| {
+                    vec![
+                        "gpt-6-astra".to_string(),
+                        "gpt-5.6-sol".to_string(),
+                        "jev-latest".to_string(),
+                    ]
+                });
             config.advisor_model = config
                 .config_layer_stack
                 .effective_config()

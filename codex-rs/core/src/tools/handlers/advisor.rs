@@ -13,6 +13,8 @@ use crate::tools::handlers::advisor_spec::ADVISOR_TOOL_NAME;
 use crate::tools::handlers::advisor_spec::create_advisor_tool;
 use crate::tools::registry::CoreToolRuntime;
 use crate::tools::registry::ToolExecutor;
+use codex_http_client::ClientRouteClass;
+use codex_http_client::RouteAwareClientPool;
 use codex_protocol::models::BaseInstructions;
 use codex_protocol::models::BaseInstructionsProvenance;
 use codex_protocol::models::ResponseItem;
@@ -23,10 +25,43 @@ use codex_tools::ToolSpec;
 use codex_utils_output_truncation::approx_token_count;
 use codex_utils_output_truncation::truncate_text;
 use futures::StreamExt;
+use serde::Deserialize;
+use serde_json::json;
+use std::path::Path;
+use std::time::Duration;
+use tokio::fs;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 const ADVISOR_TRANSCRIPT_MAX_TOKENS: usize = 8_000;
 const ADVISOR_GUIDANCE_MAX_TOKENS: usize = 2_000;
 const ADVISOR_BASE_INSTRUCTIONS: &str = "You are a read-only advisor to another coding agent. Analyze the supplied executor transcript. Identify important constraints, risks, incorrect assumptions, and the best next actions. Do not call tools. Do not address the end user. Return only concise guidance to the executor.";
+const JEV_MODEL: &str = "jev-latest";
+const JEV_ENDPOINT: &str = "https://api.typesafe.ai/v1/systemone";
+const JEV_KEY_FILE: &str = "secrets/typesafe_api_key";
+const JEV_QUESTION_MAX_CHARS: usize = 1_000;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JevArguments {
+    question: String,
+}
+
+#[derive(Deserialize)]
+struct JevResponse {
+    answers: JevAnswers,
+}
+
+#[derive(Deserialize)]
+struct JevAnswers {
+    judgment: JevJudgment,
+}
+
+#[derive(Deserialize)]
+struct JevJudgment {
+    noul: f64,
+}
 
 pub struct AdvisorHandler {
     model: String,
@@ -44,7 +79,7 @@ impl ToolExecutor<ToolInvocation> for AdvisorHandler {
     }
 
     fn spec(&self) -> ToolSpec {
-        create_advisor_tool()
+        create_advisor_tool(&self.model)
     }
 
     fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
@@ -57,6 +92,49 @@ impl ToolExecutor<ToolInvocation> for AdvisorHandler {
                     "advisor handler received unsupported payload".to_string(),
                 ));
             };
+            if self.model == JEV_MODEL {
+                let args: JevArguments = serde_json::from_str(arguments).map_err(|_| {
+                    FunctionCallError::RespondToModel(
+                        "Jev advisor requires a JSON object with one `question` string".to_string(),
+                    )
+                })?;
+                let question = args.question.trim();
+                if question.is_empty() || question.chars().count() > JEV_QUESTION_MAX_CHARS {
+                    return Err(FunctionCallError::RespondToModel(format!(
+                        "Jev question must contain 1 to {JEV_QUESTION_MAX_CHARS} characters"
+                    )));
+                }
+                let transcript = bounded_transcript(
+                    invocation.session.clone_history().await.raw_items(),
+                    ADVISOR_TRANSCRIPT_MAX_TOKENS,
+                );
+                let key = jev_api_key(
+                    invocation.turn.config.codex_home.as_path(),
+                    std::env::var("TYPESAFE_API_KEY").ok(),
+                )
+                .await
+                .map_err(FunctionCallError::RespondToModel)?;
+                let client = RouteAwareClientPool::new_without_redirects_or_request_logging(
+                    invocation.turn.config.http_client_factory(),
+                    ClientRouteClass::Api,
+                );
+                let result = tokio::select! {
+                    _ = invocation.cancellation_token.cancelled() => {
+                        return Err(FunctionCallError::RespondToModel(
+                            "advisor consultation was cancelled".to_string(),
+                        ));
+                    }
+                    result = consult_jev(&client, JEV_ENDPOINT, &key, &transcript, question) => result,
+                }
+                .map_err(FunctionCallError::RespondToModel)?;
+                return Ok(boxed_tool_output(FunctionToolOutput::from_text(
+                    AdvisorGuidance::new(format!(
+                        "Jev judgment for question: {question}\nProbability of yes: {result:.3}. Interpret this as evidence, not an instruction."
+                    ))
+                    .render(),
+                    Some(true),
+                )));
+            }
             if !arguments.trim().is_empty() && arguments.trim() != "{}" {
                 return Err(FunctionCallError::RespondToModel(
                     "advisor takes no parameters".to_string(),
@@ -169,6 +247,74 @@ impl ToolExecutor<ToolInvocation> for AdvisorHandler {
 
 impl CoreToolRuntime for AdvisorHandler {}
 
+async fn jev_api_key(codex_home: &Path, env_key: Option<String>) -> Result<String, String> {
+    if let Some(key) = env_key.filter(|key| !key.trim().is_empty()) {
+        return Ok(key.trim().to_string());
+    }
+
+    let path = codex_home.join(JEV_KEY_FILE);
+    let metadata = match fs::symlink_metadata(&path).await {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            return Err(format!(
+                "Jev advisor requires TYPESAFE_API_KEY or {}",
+                path.display()
+            ));
+        }
+        Err(err) => return Err(format!("Jev key file could not be checked: {err}")),
+    };
+    if !metadata.is_file() || metadata.len() > 4_096 {
+        return Err("Jev key file must be a regular file smaller than 4 KiB".to_string());
+    }
+    #[cfg(unix)]
+    if metadata.permissions().mode() & 0o077 != 0 {
+        return Err("Jev key file must be private (chmod 600)".to_string());
+    }
+    let key = fs::read_to_string(&path)
+        .await
+        .map_err(|err| format!("Jev key file could not be read: {err}"))?;
+    let key = key.trim();
+    if key.is_empty() {
+        return Err("Jev key file is empty".to_string());
+    }
+    Ok(key.to_string())
+}
+
+async fn consult_jev(
+    client: &RouteAwareClientPool,
+    endpoint: &str,
+    key: &str,
+    transcript: &str,
+    question: &str,
+) -> Result<f64, String> {
+    let response = client
+        .post(endpoint)
+        .header("Authorization", format!("Bearer {key}"))
+        .timeout(Duration::from_secs(30))
+        .json(&json!({
+            "model": JEV_MODEL,
+            "state": transcript,
+            "questions": {
+                "judgment": { "type": "noul", "instructions": question }
+            }
+        }))
+        .send()
+        .await
+        .map_err(|err| format!("Jev request failed: {err}"))?;
+    if !response.status().is_success() {
+        return Err(format!("Jev returned HTTP {}", response.status()));
+    }
+    let response: JevResponse = response
+        .json()
+        .await
+        .map_err(|err| format!("Jev response was invalid: {err}"))?;
+    let value = response.answers.judgment.noul;
+    if !(0.0..=1.0).contains(&value) {
+        return Err("Jev response contained an invalid probability".to_string());
+    }
+    Ok(value)
+}
+
 fn bounded_transcript<'a>(
     items: impl DoubleEndedIterator<Item = &'a ResponseItem>,
     max_tokens: usize,
@@ -207,3 +353,7 @@ fn last_assistant_text(items: &[ResponseItem]) -> Option<String> {
             .filter(|text| !text.trim().is_empty())
     })
 }
+
+#[cfg(test)]
+#[path = "advisor_tests.rs"]
+mod tests;
