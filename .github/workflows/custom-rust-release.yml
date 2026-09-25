@@ -13,6 +13,7 @@ permissions:
   contents: write
 
 env:
+  CODEX_REPO_ROOT: ${{ github.workspace }}
   AWS_LC_SYS_NO_JITTER_ENTROPY: "1"
   AWS_LC_SYS_NO_JITTER_ENTROPY_x86_64_unknown_linux_musl: "1"
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
