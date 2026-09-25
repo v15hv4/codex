@@ -1,0 +1,19 @@
+---
+source: tui/src/chatwidget/tests/advisor_popup_tests.rs
+assertion_line: 14
+expression: "render_bottom_popup(&chat, 80)"
+---
+  Select advisor model
+  Codex consults it for consequential decisions and completion reviews.
+
+
+› 1. Off (current)  Do not consult an advisor
+  2. GPT-6-Astra    gpt-6-astra
+  3. GPT-6-Sol      gpt-6-sol
+  4. GPT-6-Luna     gpt-6-luna
+  5. GPT-5.6-Sol    gpt-5.6-sol
+  6. GPT-5.6-Terra  gpt-5.6-terra
+  7. GPT-5.6-Luna   gpt-5.6-luna
+  8. GPT-5.5        gpt-5.5
+
+  enter select · esc back

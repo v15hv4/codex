@@ -1195,6 +1195,11 @@ pub(crate) enum AppEvent {
         effort: Option<ReasoningEffort>,
     },
 
+    /// Save the advisor model to user config and reload active threads.
+    PersistAdvisorModel {
+        model: Option<String>,
+    },
+
     /// Apply a model and effort only to the active session, preserving saved defaults.
     SelectSessionModel {
         model: String,

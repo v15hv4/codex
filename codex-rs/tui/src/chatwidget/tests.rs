@@ -227,6 +227,8 @@ fn next_goal_draft(
     }
 }
 
+#[path = "tests/advisor_popup_tests.rs"]
+mod advisor_popup_tests;
 mod app_server;
 mod approval_requests;
 #[path = "tests/backend_banners_tests.rs"]

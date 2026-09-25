@@ -2056,6 +2056,7 @@ impl Session {
                 .then(|| self.build_effective_session_config(&state.session_configuration));
             let mut config = (*state.session_configuration.original_config_do_not_use).clone();
             config.active_project = next_config.active_project.clone();
+            config.advisor_model = next_config.advisor_model.clone();
             config.config_layer_stack = config
                 .config_layer_stack
                 .with_user_layer_from(&next_config.config_layer_stack);

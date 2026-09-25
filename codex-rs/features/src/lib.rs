@@ -362,6 +362,8 @@ pub enum Feature {
     FastMode,
     /// Enable explicitly requested model changes for later step captures.
     StepModelSwitching,
+    /// Let the model consult a configured advisor for consequential decisions and completion review.
+    Advisor,
     /// Enable voice conversations in the TUI.
     RealtimeConversation,
     /// Prevent idle system sleep while a turn is actively running.
@@ -1756,6 +1758,16 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::StepModelSwitching,
         key: "step_model_switching",
         stage: Stage::UnderDevelopment,
+        default_enabled: false,
+    },
+    FeatureSpec {
+        id: Feature::Advisor,
+        key: "advisor",
+        stage: Stage::Experimental {
+            name: "Advisor",
+            menu_description: "Consult a second model on consequential decisions and completion checks.",
+            announcement: "NEW: Advisor can now be enabled from /experimental.",
+        },
         default_enabled: false,
     },
     FeatureSpec {

@@ -671,6 +671,9 @@
           "default": null,
           "description": "Optional feature toggles scoped to this profile.",
           "properties": {
+            "advisor": {
+              "type": "boolean"
+            },
             "agent_message_board": {
               "type": "boolean"
             },
@@ -6494,6 +6497,10 @@
   },
   "description": "Base config deserialized from ~/.codex/config.toml.",
   "properties": {
+    "advisor_model": {
+      "description": "Model used for experimental advisor consultations.",
+      "type": "string"
+    },
     "agents": {
       "allOf": [
         {
@@ -6668,6 +6675,9 @@
       "default": null,
       "description": "Centralized feature flags (new). Prefer this over individual toggles.",
       "properties": {
+        "advisor": {
+          "type": "boolean"
+        },
         "agent_message_board": {
           "type": "boolean"
         },

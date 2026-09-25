@@ -6,6 +6,7 @@ use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use crate::tools::code_mode::execute_spec::create_code_mode_tool;
 use crate::tools::effective_tool_mode;
+use crate::tools::handlers::AdvisorHandler;
 use crate::tools::handlers::ApplyPatchHandler;
 use crate::tools::handlers::CodeModeExecuteHandler;
 use crate::tools::handlers::CodeModeWaitHandler;
@@ -1032,6 +1033,15 @@ fn add_core_tool_sources(context: &CoreToolPlanContext<'_>, registry: &mut ToolR
     add_shell_tools(context, registry);
     add_mcp_resource_tools(context, registry);
     add_core_utility_tools(context, registry);
+    if context
+        .turn_context
+        .config
+        .features
+        .enabled(Feature::Advisor)
+        && context.turn_context.config.advisor_model.is_some()
+    {
+        registry.add_with_exposure(AdvisorHandler, ToolExposure::Direct);
+    }
     add_collaboration_tools(context, registry);
 }
 

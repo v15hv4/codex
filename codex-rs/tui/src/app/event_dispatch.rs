@@ -2312,6 +2312,35 @@ impl App {
                     }
                 }
             }
+            AppEvent::PersistAdvisorModel { model } => {
+                let edit = model.as_ref().map_or_else(
+                    || crate::config_update::clear_config_value("advisor_model"),
+                    |model| crate::config_update::replace_config_value(
+                        "advisor_model",
+                        serde_json::json!(model),
+                    ),
+                );
+                match crate::config_update::write_config_batch(
+                    app_server.request_handle(),
+                    vec![edit],
+                ).await {
+                    Ok(_) => {
+                        self.config.advisor_model = model.clone();
+                        self.chat_widget.update_advisor_model(model.clone());
+                        self.chat_widget.add_info_message(
+                            model.map_or_else(
+                                || "Advisor disabled".to_string(),
+                                |model| format!("Advisor set to {model}"),
+                            ),
+                            /*hint*/ None,
+                        );
+                    }
+                    Err(err) => self.chat_widget.add_error_message(format!(
+                        "Failed to save advisor model: {}",
+                        format_config_error(&err),
+                    )),
+                }
+            }
             AppEvent::SelectSessionModel { model, effort } => {
                 self.app_event_tx.send(AppEvent::FollowTranscript);
                 self.select_session_model(app_server, model, effort).await;

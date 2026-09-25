@@ -627,6 +627,9 @@ pub struct Config {
     /// Model used specifically for review sessions.
     pub review_model: Option<String>,
 
+    /// Model used for experimental advisor consultations.
+    pub advisor_model: Option<String>,
+
     /// Size of the context window for the model, in tokens.
     pub model_context_window: Option<i64>,
 
@@ -4256,6 +4259,7 @@ impl Config {
             model,
             service_tier,
             review_model,
+            advisor_model: cfg.advisor_model,
             model_context_window: cfg.model_context_window,
             model_auto_compact_token_limit: cfg.model_auto_compact_token_limit,
             model_auto_compact_token_limit_scope: cfg
