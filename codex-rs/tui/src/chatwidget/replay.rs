@@ -348,6 +348,19 @@ impl ChatWidget {
                 summary,
                 content,
             } => {
+                if id.starts_with("advisor-") {
+                    if let Some(result) = summary.first() {
+                        let status = if result.starts_with("Advisor (")
+                            && result.contains(") reviewed in ")
+                        {
+                            "[advisor consulted]"
+                        } else {
+                            "[advisor failed]"
+                        };
+                        self.add_info_message(status.to_string(), /*hint*/ None);
+                    }
+                    return;
+                }
                 let recover_completion = self.status_state.reasoning_recovered_after_refresh
                     && (!summary.is_empty()
                         || (self.config.show_raw_agent_reasoning && !content.is_empty()));

@@ -543,6 +543,9 @@ impl ChatWidget {
                 self.is_realtime_delegated_agent_item(&notification.turn_id, &id);
             }
             ThreadItem::Reasoning { id, .. } => {
+                if id.starts_with("advisor-") {
+                    return;
+                }
                 if replay_kind.is_none()
                     && !self.is_realtime_delegated_reasoning_turn(&notification.turn_id)
                 {
@@ -643,6 +646,7 @@ impl ChatWidget {
         }
         if replay_kind.is_none()
             && let ThreadItem::Reasoning { id, .. } = &notification.item
+            && !id.starts_with("advisor-")
             && self.status_state.reasoning_item_id.as_ref() != Some(id)
         {
             return;
