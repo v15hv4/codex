@@ -1,8 +1,8 @@
 //! Projects bounded retained root evidence for worker reviewers.
 //! Retained root instructions stay authoritative while old checkpoints use legacy review.
-//! User evidence wins, then assistant context preceding ordinary replies, then other live evidence.
-//! Recovery includes commentary and confirmed messaging context.
-//! Projection limits do not change authorization completeness; unavailable source text does.
+//! Selects recent user and assistant evidence together by source order.
+//! Explicit assistant commentary is excluded; confirmed messaging survives compaction.
+//! Projection omissions keep missing authorization and assistant context explicit.
 //! Retained-history reconciliation owns recovery order and missing-instruction provenance.
 //! Known positions preserve host order, not delivery order or inferred question-answer pairs.
 //! Unmatched legacy instructions supplement retained facts without claiming a known ordering.
@@ -19,6 +19,7 @@ use crate::context::ContextualUserFragment;
 use crate::context::GuardianReviewEvidence;
 use crate::context::UserGoalUpdate;
 use crate::context::is_contextual_user_fragment;
+use crate::context::render_retained_assistant_context;
 use crate::event_mapping::parse_turn_item;
 use crate::guardian::GUARDIAN_MAX_ROOT_MESSAGE_TOKENS;
 use crate::guardian::guardian_truncate_text;
@@ -31,6 +32,7 @@ use codex_protocol::ThreadId;
 use codex_protocol::items::AgentMessageContent;
 use codex_protocol::items::TurnItem;
 use codex_protocol::models::ContentItem;
+use codex_protocol::models::MessagePhase;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::MultiAgentVersion;
 
@@ -113,6 +115,7 @@ impl LocalAgentControl {
                     Some((
                         order,
                         RetainedUserMessage {
+                            phase: None,
                             origin: codex_history::UserInputOrigin::from_message(item),
                             turn_id: item.turn_id().unwrap_or_default().to_owned(),
                             message_id: item.id().map(|id| id.as_str().to_owned()),
@@ -176,7 +179,6 @@ impl LocalAgentControl {
                 RetainedContextEntry::AssistantMessage(_) => None,
             })
             .collect::<Vec<_>>();
-        messages.drain(..messages.len().saturating_sub(MAX_ROOT_MESSAGES));
         // Old opt-out checkpoints have genuine instructions but no retained source order.
         // Keep them separately bounded and explicitly unordered; never replace newer facts.
         let mut legacy_messages = VecDeque::new();
@@ -220,10 +222,9 @@ impl LocalAgentControl {
                         .map(|_| (order, message))
                 });
                 if let Some((order, message)) = retained
-                    && let Some(message) =
-                        codex_guardian_context::retained_assistant_message(message)
+                    && let Some(text) = render_retained_assistant_context(message)
                 {
-                    return Some((id, Some(order), message));
+                    return Some((id, Some(order), GuardianRootMessage::Assistant(text)));
                 }
                 let order = envelope
                     .metadata
@@ -246,6 +247,20 @@ impl LocalAgentControl {
                 let RetainedContextEntry::AssistantMessage(message) = entry else {
                     return None;
                 };
+                if message.phase == Some(MessagePhase::Commentary)
+                    || message.message_id.as_deref().is_some_and(|id| {
+                        root_history
+                            .raw_items()
+                            .chain(root_history.guardian_history_items().into_iter().flatten())
+                            .any(|item| {
+                                matches!(item, ResponseItem::Message {
+                                id: Some(source_id), phase: Some(MessagePhase::Commentary), ..
+                            } if source_id.as_str() == id)
+                            })
+                    })
+                {
+                    return None;
+                }
                 if message.message_id.as_deref().is_some_and(|id| {
                     live_assistant_messages
                         .iter()
@@ -253,7 +268,8 @@ impl LocalAgentControl {
                 }) {
                     return None;
                 }
-                let rendered = codex_guardian_context::retained_assistant_message(message);
+                let rendered =
+                    render_retained_assistant_context(message).map(GuardianRootMessage::Assistant);
                 missing_assistant_context |= rendered.is_none();
                 rendered.map(|message| (Some(order), message))
             })
@@ -263,29 +279,32 @@ impl LocalAgentControl {
                 .into_iter()
                 .map(|(_, order, message)| (order, message)),
         );
-        // Keep the nearest known assistant context for each ordinary reply. Verified
-        // answers already include their questions; unsequenced sources cannot be paired.
-        let reply_context_orders = messages
-            .iter()
-            .filter_map(|(user_order, message)| {
-                let (Some(user_order), GuardianRootMessage::User(_)) = (user_order, message) else {
-                    return None;
-                };
-                assistant_messages
-                    .iter()
-                    .filter_map(|(order, _)| *order)
-                    .filter(|order| order < user_order)
-                    .max()
-            })
-            .collect::<Vec<_>>();
-        // Stable sorting keeps other live evidence ahead of retained-only extras.
-        assistant_messages
-            .sort_by_key(|(order, _)| order.filter(|order| reply_context_orders.contains(order)));
-        let available = MAX_ROOT_MESSAGES.saturating_sub(messages.len() + legacy_messages.len());
-        missing_assistant_context |= assistant_messages.len() > available;
-        assistant_messages.drain(..assistant_messages.len().saturating_sub(available));
         messages.extend(assistant_messages);
+        // Unknown order cannot establish recency; prune these assistants first.
+        messages.sort_by_key(|(order, _)| *order);
+        // Apply one shared cap so user records and confirmed questions compete
+        // while keeping omissions explicit for authorization and assistant context.
+        let removed = messages.len().saturating_sub(MAX_ROOT_MESSAGES);
+        missing_root_instructions |= messages[..removed].iter().any(|(_, message)| {
+            matches!(
+                message,
+                GuardianRootMessage::User(_) | GuardianRootMessage::UserInput(_)
+            )
+        });
+        missing_assistant_context |= messages[..removed].iter().any(|(_, message)| {
+            matches!(
+                message,
+                GuardianRootMessage::Assistant(_) | GuardianRootMessage::UnorderedAssistant(_)
+            )
+        });
+        messages.drain(..removed);
+        // Keep the existing presentation of unordered evidence after ordered records.
         messages.sort_by_key(|(order, _)| (order.is_none(), *order));
+        legacy_messages.drain(
+            ..legacy_messages
+                .len()
+                .saturating_sub(MAX_ROOT_MESSAGES - messages.len()),
+        );
         let mut messages = messages
             .into_iter()
             .map(|(_, message)| message)
@@ -324,6 +343,7 @@ impl LocalAgentControl {
             root_thread_id,
             history_reset_version: root_history.reset_version,
             authorization_version,
+            review_context_revision: history.guardian_review_context_revision(),
             messages,
             trusted_skill_paths,
         })
@@ -342,6 +362,9 @@ fn root_assistant_text(
             let Some(TurnItem::AgentMessage(message)) = parse_turn_item(item) else {
                 return None;
             };
+            if message.phase == Some(MessagePhase::Commentary) {
+                return None;
+            }
             message
                 .content
                 .iter()
