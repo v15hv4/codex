@@ -1,4 +1,5 @@
 use anyhow::Result;
+use codex_core::ConfigRefreshOutcome;
 use codex_core::TurnInputRequest;
 use codex_features::Feature;
 use codex_protocol::items::TurnItem;
@@ -17,8 +18,12 @@ use core_test_support::wait_for_event_match;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
+#[test_case::test_case(None; "enable advisor")]
+#[test_case::test_case(Some("gpt-5.4"); "change advisor model")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn advisor_receives_bounded_context_without_tools_and_returns_advice() -> Result<()> {
+async fn advisor_receives_bounded_context_without_tools_and_returns_advice(
+    initial_advisor: Option<&'static str>,
+) -> Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -50,8 +55,8 @@ async fn advisor_receives_bounded_context_without_tools_and_returns_advice() -> 
     .await;
     let test = test_codex()
         .with_model("gpt-5.5")
-        .with_config(|config| {
-            config.advisor_model = Some("gpt-5.5".to_string());
+        .with_config(move |config| {
+            config.advisor_model = initial_advisor.map(str::to_string);
             config
                 .features
                 .enable(Feature::Advisor)
@@ -67,6 +72,16 @@ async fn advisor_receives_bounded_context_without_tools_and_returns_advice() -> 
         })
         .build_with_auto_env(&server)
         .await?;
+
+    let current_config = test.codex.config().await;
+    let mut next_config = current_config.as_ref().clone();
+    next_config.advisor_model = Some("gpt-5.5".to_string());
+    assert_eq!(
+        test.codex
+            .refresh_runtime_config(current_config, next_config)
+            .await,
+        ConfigRefreshOutcome::Published,
+    );
 
     test.codex
         .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
@@ -112,5 +127,24 @@ async fn advisor_receives_bounded_context_without_tools_and_returns_advice() -> 
     );
     let output = requests[2].function_call_output("advisor-call");
     assert!(output.to_string().contains("Check rollback before deploy."));
+
+    let current_config = test.codex.config().await;
+    let mut next_config = current_config.as_ref().clone();
+    next_config.advisor_model = None;
+    assert_eq!(
+        test.codex
+            .refresh_runtime_config(current_config, next_config)
+            .await,
+        ConfigRefreshOutcome::Published,
+    );
+    let disabled_mock =
+        responses::mount_sse_once(&server, sse(vec![ev_completed("executor-without-advisor")]))
+            .await;
+    test.submit_turn("Continue without an advisor").await?;
+    assert!(
+        disabled_mock.single_request().body_json()["tools"]
+            .as_array()
+            .is_some_and(|tools| tools.iter().all(|tool| tool["name"] != "ask_advisor"))
+    );
     Ok(())
 }
